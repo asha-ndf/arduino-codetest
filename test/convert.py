@@ -7,26 +7,26 @@ import shutil
 import re
 from pathlib import Path
 
-# Arduino API → モック呼び出しへの置換パターン
+# Arduino → emulatorXXXX
 REPLACEMENTS = [
     # Arduino.h → mock_arduino.h
     (r'#\s*include\s*<Arduino\.h>', '#include "mock_arduino.h"'),
 
     # Serial
-    (r'\bSerial\.begin\s*\(\s*([0-9]+)\s*\)', r'mySerialBegin(\1)'),
-    (r'\bSerial\.println\s*\(\s*(.*)\)', r'mySerialPrintln(\1)'),
-    (r'\bSerial\.print\s*\(\s*(.*)\)', r'mySerialPrint(\1)'),
+    (r'\bSerial\.begin\s*\(\s*([0-9]+)\s*\)', r'emulatorSerialBegin(\1)'),
+    (r'\bSerial\.println\s*\(\s*(.*)\)', r'emulatorSerialPrintln(\1)'),
+    (r'\bSerial\.print\s*\(\s*(.*)\)', r'emulatorSerialPrint(\1)'),
 
     # pinMode, analogRead, delay, millis
-    (r'\bpinMode\s*\(\s*([^\)]+)\)', r'myPinMode(\1)'),
-    (r'\banalogRead\s*\(\s*([^\)]+)\)', r'myAnalogRead(\1)'),
-    (r'\bdelay\s*\(\s*([^\)]+)\)', r'myDelay(\1)'),
-    (r'\bmillis\s*\(\s*\)', r'myMillis()'),
+    (r'\bpinMode\s*\(\s*([^\)]+)\)', r'emulatorPinMode(\1)'),
+    (r'\banalogRead\s*\(\s*([^\)]+)\)', r'emulatorAnalogRead(\1)'),
+    (r'\bdelay\s*\(\s*([^\)]+)\)', r'emulatorDelay(\1)'),
+    (r'\bmillis\s*\(\s*\)', r'emulatorMillis()'),
 ]
 
 def transform_code(code: str) -> str:
     """
-    Arduino特有の呼び出しをモック呼び出しへ書き換える関数
+    Arduino特有の呼び出しを emulatorXXXX 系に書き換える関数
     """
     replaced = code
     for pattern, repl in REPLACEMENTS:
@@ -50,7 +50,7 @@ def main():
     script_dir = Path(__file__).parent.resolve()
     temp_dir = script_dir / "tempcode"
 
-    # tempcode を作り直す
+    # tempcode を再作成
     if temp_dir.exists():
         shutil.rmtree(temp_dir)
     temp_dir.mkdir(parents=True)
@@ -58,7 +58,7 @@ def main():
     print(f"[INFO] Copying and transforming code from: {target_dir}")
     print(f"[INFO] Output to: {temp_dir}")
 
-    # 1) .ino, .cpp, .hを取得してコピー&置換
+    # 1) .ino, .cpp, .h をコピー＆置換
     patterns = ["*.ino", "*.cpp", "*.h"]
     for pat in patterns:
         for fpath in target_dir.rglob(pat):
@@ -66,7 +66,6 @@ def main():
             out_path = temp_dir / rel
             out_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # 読み込み (UTF-8想定)
             with open(fpath, "r", encoding="utf-8") as fr:
                 content = fr.read()
 
@@ -83,7 +82,7 @@ def main():
 
             print(f"  - Transformed: {rel} -> {out_path.name}")
 
-    # 2) mock_arduino.h と mock_arduino.cpp を tempcode にコピー
+    # 2) mock_arduino.h & mock_arduino.cpp を tempcode にコピー
     for mock_file in ["mock_arduino.h", "mock_arduino.cpp"]:
         mock_src = script_dir / mock_file
         if mock_src.exists():
@@ -96,11 +95,11 @@ def main():
         else:
             print(f"[WARN] {mock_file} not found in {script_dir}")
 
-    # 3) arduino_runner.cpp を生成 (mainでsetup/loop呼ぶ)
+    # 3) arduino_runner.cpp を生成 (mainで setup/loop を呼び出す)
     runner_code = r'''
 #include "mock_arduino.h"
 
-// もとスケッチ(.inoなど)にあるsetup()/loop()をextern参照
+// 元スケッチ(.ino等)にある setup()/loop() をextern参照
 extern void setup();
 extern void loop();
 

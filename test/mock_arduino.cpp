@@ -1,37 +1,40 @@
 #include "mock_arduino.h"
 
-unsigned long g_mock_millis = 0;
+unsigned long g_emulator_millis = 0; // 実体をここで定義
 
-unsigned long myMillis() {
-    return g_mock_millis;
+unsigned long emulatorMillis() {
+    return g_emulator_millis;
 }
 
-void myDelay(unsigned long ms) {
-    g_mock_millis += ms;
+void emulatorDelay(unsigned long ms) {
+    g_emulator_millis += ms;
 }
 
-void myPinMode(int pin, int mode) {
-    // do nothing
+void emulatorPinMode(int pin, int mode) {
+    // モック → 何もしない
 }
 
-int myAnalogRead(int pin) {
-    return pin + (g_mock_millis % 1024);
+int emulatorAnalogRead(int pin) {
+    // 適当なダミー値
+    return pin + (g_emulator_millis % 1024);
 }
 
-void mySerialBegin(int baud) {
-    std::cout << "[MOCK] Serial.begin(" << baud << ")\n";
+void emulatorSerialBegin(int baud) {
+    std::cout << "[EMULATOR] Serial.begin(" << baud << ")\n";
 }
 
-void mySerialPrint(const std::string &s) {
+void emulatorSerialPrint(const std::string &s) {
     std::cout << s;
 }
-void mySerialPrintln(const std::string &s) {
+
+void emulatorSerialPrintln(const std::string &s) {
     std::cout << s << std::endl;
 }
 
-void mySerialPrint(int val) {
+void emulatorSerialPrint(int val) {
     std::cout << val;
 }
-void mySerialPrintln(int val) {
+
+void emulatorSerialPrintln(int val) {
     std::cout << val << std::endl;
 }

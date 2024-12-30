@@ -4,7 +4,9 @@
 #include <string>
 #include <iostream>
 
-/* 定数類 */
+//-------------------------------------
+// Arduinoでよく使われる定数をマクロ化
+//-------------------------------------
 #ifndef A0
 #define A0 14
 #endif
@@ -14,6 +16,10 @@
 #ifndef OUTPUT
 #define OUTPUT 1
 #endif
+#ifndef INPUT_PULLUP
+#define INPUT_PULLUP 2
+#endif
+
 #ifndef HIGH
 #define HIGH 1
 #endif
@@ -21,19 +27,24 @@
 #define LOW 0
 #endif
 
+//-------------------------------------
 // グローバル疑似時間
-extern unsigned long g_mock_millis;
+//-------------------------------------
+extern unsigned long g_emulator_millis;  
 
-// プロトタイプ宣言
-unsigned long myMillis();
-void myDelay(unsigned long ms);
-void myPinMode(int pin, int mode);
-int myAnalogRead(int pin);
+//-------------------------------------
+// 関数プロトタイプ
+//-------------------------------------
+unsigned long emulatorMillis();
+void emulatorDelay(unsigned long ms);
 
-void mySerialBegin(int baud);
-void mySerialPrint(const std::string &s);
-void mySerialPrintln(const std::string &s);
-void mySerialPrint(int val);
-void mySerialPrintln(int val);
+void emulatorPinMode(int pin, int mode);
+int emulatorAnalogRead(int pin);
+
+void emulatorSerialBegin(int baud);
+void emulatorSerialPrint(const std::string &s);
+void emulatorSerialPrintln(const std::string &s);
+void emulatorSerialPrint(int val);
+void emulatorSerialPrintln(int val);
 
 #endif // MOCK_ARDUINO_H
