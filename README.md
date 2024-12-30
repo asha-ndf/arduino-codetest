@@ -1,94 +1,90 @@
 # Arduino Code Testing Project
 
-このリポジトリは、Arduino スケッチ( .ino ) および関連の .cpp / .h ファイルを PC 上でモックテストし、GitHub Actions を利用して自動テストを行うサンプルです。
+## 以下、ChatGPT によって生成された要約文です
 
-## プロジェクト概要
+このリポジトリでは、Arduino の `.ino` や `.cpp` コードを PC 上でモックし、複数のテストケース（JSON）を用いて実行する仕組みを構築しています。  
+GitHub Actions を用いた自動テストにも対応し、複数ファイルに分割された Arduino スケッチを一括テストできます。
 
-- `src/main/` ディレクトリに Arduino のスケッチや .cpp / .h が置かれます。
-- `test/convert.py` は、Arduino 特有の API (pinMode, analogRead, Serial.print など) をモック関数に書き換え、CMake でビルドできる C++コードへ変換します。
-- `test/mock_arduino.h` & `mock_arduino.cpp` が、Arduino ハードウェア呼び出しをモック化した実装を提供します。
-  - `A0`, `INPUT` などの定数、`myPinMode`, `myAnalogRead` などの関数が定義され、実機依存コードをエミュレートします。
-- `test/run_test_windows.sh` では Windows + Visual Studio 用のビルドを行い、
-  - `cmake -G "Visual Studio 17 2022" & --config Debug`
-  - `./Debug/MyArduinoProjectTest.exe` 実行
-- `test/run_test_ubuntu.sh` では Ubuntu + Ninja を使ったビルドを行い、
-  - `cmake -G Ninja -DCMAKE_BUILD_TYPE=Release`
-  - `./MyArduinoProjectTest` 実行
-- GitHub Actions (`.github/workflows/test-ubuntu.yml` など) により、Push や Pull Request 時に自動テストを行います。
+---
 
-## ディレクトリ構成
+## 主な特徴
+
+1. **Arduino 特有の API (`pinMode`, `digitalWrite`, `analogRead` 等) をモック実装**
+   - `mock_arduino.*` によって擬似的な Arduino 関数が定義され、`g_emulator_millis` を疑似時刻として管理。
+2. **`TestCaseManager` によるテストケース管理**
+   - `timeValues` (アナログ入力: ピン+時刻+値)
+   - `digitalValues` (デジタル入力: ピン+時刻+HIGH/LOW)
+   - JSON ファイルで定義し、Zero-Order Hold 等のロジックで `timeMs` が進むほど入力値を変化させます。
+3. **`run_all_tests.cpp` でメイン関数(エントリポイント)を定義**
+   - Arduino コードの `setup()` / `loop()` を呼ぶ。
+   - 引数で JSON ファイルを受け取りテストを実行。あるいは Bash スクリプトで複数ファイルを一括実行。
+4. **GitHub Actions 上で自動テスト**
+   - `.github/workflows/test-ubuntu.yml` により、Ninja ビルド後、`testcases/` の `.json` を一括実行し、`k/n` の形式でサマリを表示 (すべて合格としてカウント) 。
+
+---
+
+## ディレクトリ構成例
 
 ```plaintext
 arduino-codetest/
  ├─ src/
  │   └─ main/
- │       ├─ main.ino          # メインのArduinoスケッチ
- │       ├─ Sensor.cpp        # 追加のC++コード
- │       └─ Sensor.h          # ヘッダ
+ │       ├─ main.ino
+ │       ├─ Sensor.cpp
+ │       └─ Sensor.h
  ├─ test/
- │   ├─ convert.py            # 変換スクリプト (Arduino -> モックC++)
- │   ├─ mock_arduino.h        # モックの宣言のみ
- │   ├─ mock_arduino.cpp      # モックの実装 (実体)
- │   ├─ run_test_windows.sh   # Windows環境でのビルド＆実行
- │   ├─ run_test_ubuntu.sh    # Ubuntu環境でのビルド＆実行
- │   └─ tempcode/             # スクリプト実行時に自動生成される中間コード& CMakeLists
- ├─ build/                    # CMakeビルド用のディレクトリ (生成物など)
- │   └─ Debug/                # Windows(VS)のDebugビルド成果物 (exeなど)
+ │   ├─ convert_allcases.py
+ │   ├─ mock_arduino.h
+ │   ├─ mock_arduino.cpp
+ │   ├─ test_case_manager.h
+ │   ├─ test_case_manager.cpp
+ │   ├─ run_all_tests.cpp
+ │   ├─ run_alltestcases_win.sh
+ │   ├─ run_testcases_ubuntu.sh
+ │   ├─ testcases/
+ │   │   ├─ case1.json
+ │   │   ├─ case2.json
+ │   │   └─ ...
+ │   └─ tempcode/
+ │       ├─ ... (Pythonスクリプト実行後に生成される)
  ├─ .github/
  │   └─ workflows/
- │       └─ test-ubuntu.yml   # GitHub ActionsのUbuntu CI定義例
- ├─ .gitignore                # ビルド成果物やtempcodeを除外
- └─ README.md                 # このファイル
+ │       └─ test-ubuntu.yml
+ └─ build/
+     ├─ Debug/ (Windowsビルド成果物)
+     └─ run_all_tests.exe (生成物)
 ```
 
-## 主なファイルの説明
+- `convert_allcases.py` (または `convert.py`) は Arduino スケッチをモック用に置換し、 `tempcode/` に C++コードや `CMakeLists.txt` を生成。
+- `mock_arduino.*` が Arduino API をモック化 (`g_emulator_millis`, `emulatorAnalogRead`, `emulatorDigitalRead` など)。
+- `test_case_manager.*` が JSON を読み込み、(time, pin)に応じた入力値を返す。
+- `run_all_tests.cpp` にメイン関数があり、コマンドライン引数で JSON ファイルを受け取ってテスト実行するか、あるいは引数なしで特定ファイルを読み込むなど自由に実装できる。
 
-- `src/main/main.ino`, `Sensor.cpp`, `Sensor.h`
-  - Arduino 向けに書かれたスケッチ＆追加ライブラリ/コード。
-  - 例: `main.ino` では `setup()` / `loop()` を定義、`Sensor.cpp` ではセンサー読み取りなど。
-- `test/convert.py`
-  - Python スクリプト。
-  - `.ino` / `.cpp` / `.h` から Arduino ハードウェア依存コードを正規表現で置換し、PC 上でコンパイル可能な C++へ変換して `test/tempcode/` に出力。
-  - `#include <Arduino.h>` → `#include "mock_arduino.h"`
-  - `pinMode` → `myPinMode` など
-- `test/mock_arduino.h` / `test/mock_arduino.cpp`
-  - Arduino API を模倣するモック実装。
-  - `A0`, `INPUT`, `HIGH` などの定数をマクロ化し、`myPinMode`, `mySerialPrint`, `myAnalogRead` などの関数を定義。
-  - 実機の代わりに適当な値を返し、PC 上でテスト可能に。
-- `test/run_test_windows.sh`
-  - Git Bash などで実行し、Windows + Visual Studio 用にビルド → 実行を行うサンプル。
-  - `cmake -G "Visual Studio 17 2022" ...`
-  - `cmake --build . --config Debug`
-  - `./Debug/MyArduinoProjectTest.exe`
-- `test/run_test_ubuntu.sh`
-  - Ubuntu 上で実行し、Ninja を使用したビルド → 実行を行うサンプル。
-  - `cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ...`
-  - `./MyArduinoProjectTest`
-- `.github/workflows/test-ubuntu.yml`
-  - GitHub Actions のワークフロー定義。
-  - `ubuntu-latest` を使用し、`run_test_ubuntu.sh` を自動で実行する。
-  - Push / PR 時に CI を回してテスト結果を確認できる。
+---
 
-## 動かし方 (ローカル)
+## 使用手順
 
-### Windows (Visual Studio)
+1. **リポジトリを clone**
 
-1. Git Bash (または WSL) を起動
-2. `bash test/run_test_windows.sh`
-3. `convert.py` により `test/tempcode/` に変換済みコード & CMakeLists が生成される
-4. `build/` ディレクトリで Visual Studio ビルド → `Debug/MyArduinoProjectTest.exe` 実行
-5. 結果がコンソールに表示される
+   ```bash
+   git clone <repository_url>
+   ```
 
-### Ubuntu
+2. **(ローカル) Python スクリプトを実行し、モック用コード生成**
 
-1. `chmod +x test/run_test_ubuntu.sh`
-2. `./test/run_test_ubuntu.sh`
-3. `tempcode` にコードを配置
-4. Ninja + Release ビルド → `MyArduinoProjectTest` 実行
-5. コンソール出力を確認
+   ```bash
+   cd test
+   python convert_allcases.py ../src/main
+   ```
 
-## GitHub Actions での動作
+   - `tempcode/` に に変換後のソースコード & `CMakeLists.txt` 生成
 
-- `.github/workflows/test-ubuntu.yml` があり、push や pull_request がトリガーとなって Ubuntu の仮想環境で `run_test_ubuntu.sh` を実行します。
-- `convert.py` → `cmake` → `ninja` → `./MyArduinoProjectTest` の流れが自動的に行われ、結果が Actions のステータスに反映されます。
-- Visual Studio 用の CI が必要な場合は、別途 `windows-latest` を指定したワークフローを用意するか、`setup-msbuild` などを利用して MSBuild を使う例もあります。
+3. **(ローカル) Windows でビルド (Visual Studio)**
+
+   - `run_alltestcases_win.sh` を実行 (Git Bash 推奨) → Visual Studio ビルド → `Debug/run_all_tests.exe`
+   - `testcases/` をコピー & 各 `.json` を引数に順番に実行
+
+4. **(CI) GitHub Actions**
+
+   - `.github/workflows/test-ubuntu.yml` が動き、`run_testcases_ubuntu.sh` を使用して Ninja ビルド & 全 `.json` 実行
+   - Actions の Job Summary に「Passed k / n testcases」の形式で表示
