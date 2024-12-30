@@ -3,73 +3,136 @@
 
 import os
 import sys
-import subprocess
-import platform
 import shutil
+import re
+from pathlib import Path
+
+# Arduino API → モック呼び出しへの置換パターン
+REPLACEMENTS = [
+    # Arduino.h → mock_arduino.h
+    (r'#\s*include\s*<Arduino\.h>', '#include "mock_arduino.h"'),
+
+    # Serial
+    (r'\bSerial\.begin\s*\(\s*([0-9]+)\s*\)', r'mySerialBegin(\1)'),
+    (r'\bSerial\.println\s*\(\s*(.*)\)', r'mySerialPrintln(\1)'),
+    (r'\bSerial\.print\s*\(\s*(.*)\)', r'mySerialPrint(\1)'),
+
+    # pinMode, analogRead, delay, millis
+    (r'\bpinMode\s*\(\s*([^\)]+)\)', r'myPinMode(\1)'),
+    (r'\banalogRead\s*\(\s*([^\)]+)\)', r'myAnalogRead(\1)'),
+    (r'\bdelay\s*\(\s*([^\)]+)\)', r'myDelay(\1)'),
+    (r'\bmillis\s*\(\s*\)', r'myMillis()'),
+]
+
+def transform_code(code: str) -> str:
+    """
+    Arduino特有の呼び出しをモック呼び出しへ書き換える関数
+    """
+    replaced = code
+    for pattern, repl in REPLACEMENTS:
+        replaced = re.sub(pattern, repl, replaced)
+    return replaced
 
 def main():
-    # スクリプトのあるディレクトリに移動（お好み）
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(script_dir)
-
-    print("[INFO] === Step 1: Pythonでコード変換 ===")
-    # convert.py を実行 (ターゲット: ../src/main)
-    subprocess.check_call(["python", "convert.py", "../src/main"], cwd="test")
-
-    print("[INFO] === Step 2: ビルド用ディレクトリを作りCMake実行 ===")
-    build_dir = os.path.join(script_dir, "build")
-    if os.path.exists(build_dir):
-        shutil.rmtree(build_dir)
-    os.makedirs(build_dir)
-    os.chdir(build_dir)
-
-    # --- Windows / Ubuntu の分岐 ---
-    current_platform = sys.platform
-    # 例:
-    #  - Windows なら "win32" (または "cygwin", "msys" など)
-    #  - Ubuntu なら "linux" or "linux2"
-    #  - Macなら "darwin"
-
-    if current_platform.startswith("win"):
-        # Windows環境向け
-        print("[INFO] Detected Windows. Using Visual Studio generator & Debug config.")
-        generator = "Visual Studio 17 2022"
-        build_config = "Debug"
-        exe_path = os.path.join(build_dir, "Debug", "MyArduinoProjectTest.exe")
-        # CMake発行
-        subprocess.check_call(["cmake", "-G", generator, "../test/tempcode"])
-        subprocess.check_call(["cmake", "--build", ".", "--config", build_config])
-
-        # 実行
-        if not os.path.isfile(exe_path):
-            print(f"[ERROR] Executable not found: {exe_path}")
-            sys.exit(1)
-        print("[INFO] === Step 3: 実行ファイルを起動 ===")
-        subprocess.check_call([exe_path])  # 実行
-
-    elif current_platform.startswith("linux"):
-        # Ubuntu (Linux) 想定
-        print("[INFO] Detected Linux. Using Ninja generator & Release config.")
-        generator = "Ninja"
-        build_config = "Release"
-        exe_path = os.path.join(build_dir, "MyArduinoProjectTest")
-
-        # CMake発行
-        subprocess.check_call(["cmake", "-G", generator, "-DCMAKE_BUILD_TYPE="+build_config, "../test/tempcode"])
-        subprocess.check_call(["cmake", "--build", "."])
-
-        # 実行
-        if not os.path.isfile(exe_path):
-            print(f"[ERROR] Executable not found: {exe_path}")
-            sys.exit(1)
-        print("[INFO] === Step 3: 実行ファイルを起動 ===")
-        subprocess.check_call([exe_path])
-
-    else:
-        print("[ERROR] Unsupported platform:", current_platform)
+    """
+    Usage: python convert.py <target_dir>
+    例: python convert.py ../src/main
+    """
+    if len(sys.argv) < 2:
+        print("Usage: python convert.py <target_dir>")
         sys.exit(1)
 
-    print("[INFO] === Done! ===")
+    target_dir = Path(sys.argv[1]).resolve()
+    if not target_dir.is_dir():
+        print(f"[ERROR] Target '{target_dir}' is not a directory.")
+        sys.exit(1)
+
+    script_dir = Path(__file__).parent.resolve()
+    temp_dir = script_dir / "tempcode"
+
+    # tempcode を作り直す
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    temp_dir.mkdir(parents=True)
+
+    print(f"[INFO] Copying and transforming code from: {target_dir}")
+    print(f"[INFO] Output to: {temp_dir}")
+
+    # 1) .ino, .cpp, .hを取得してコピー&置換
+    patterns = ["*.ino", "*.cpp", "*.h"]
+    for pat in patterns:
+        for fpath in target_dir.rglob(pat):
+            rel = fpath.relative_to(target_dir)
+            out_path = temp_dir / rel
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # 読み込み (UTF-8想定)
+            with open(fpath, "r", encoding="utf-8") as fr:
+                content = fr.read()
+
+            # 置換
+            replaced = transform_code(content)
+
+            # .ino → _ino.cpp
+            if fpath.suffix.lower() == ".ino":
+                out_path = out_path.with_name(out_path.stem + "_ino.cpp")
+
+            # UTF-8(BOM付き)で保存
+            with open(out_path, "w", encoding="utf-8-sig") as fw:
+                fw.write(replaced)
+
+            print(f"  - Transformed: {rel} -> {out_path.name}")
+
+    # 2) mock_arduino.h と mock_arduino.cpp を tempcode にコピー
+    for mock_file in ["mock_arduino.h", "mock_arduino.cpp"]:
+        mock_src = script_dir / mock_file
+        if mock_src.exists():
+            mock_dest = temp_dir / mock_file
+            with open(mock_src, "r", encoding="utf-8") as fr:
+                content = fr.read()
+            with open(mock_dest, "w", encoding="utf-8-sig") as fw:
+                fw.write(content)
+            print(f"  - Copied {mock_file} -> {mock_dest.name}")
+        else:
+            print(f"[WARN] {mock_file} not found in {script_dir}")
+
+    # 3) arduino_runner.cpp を生成 (mainでsetup/loop呼ぶ)
+    runner_code = r'''
+#include "mock_arduino.h"
+
+// もとスケッチ(.inoなど)にあるsetup()/loop()をextern参照
+extern void setup();
+extern void loop();
+
+int main() {
+    setup();
+    for(int i=0; i<10; i++){
+        loop();
+    }
+    return 0;
+}
+'''
+    runner_path = temp_dir / "arduino_runner.cpp"
+    with open(runner_path, "w", encoding="utf-8-sig") as fw:
+        fw.write(runner_code)
+    print(f"  - Added: arduino_runner.cpp")
+
+    # 4) CMakeLists.txt を生成
+    cmake_text = r'''cmake_minimum_required(VERSION 3.15)
+project(MyArduinoProjectTest)
+
+set(CMAKE_CXX_STANDARD 11)
+
+file(GLOB SRCFILES "*.cpp" "*.h")
+
+add_executable(MyArduinoProjectTest ${SRCFILES})
+'''
+    cmake_path = temp_dir / "CMakeLists.txt"
+    with open(cmake_path, "w", encoding="utf-8-sig") as fw:
+        fw.write(cmake_text)
+    print(f"  - Generated: CMakeLists.txt")
+
+    print("[INFO] Done. You can now build in 'tempcode' directory.")
 
 if __name__ == "__main__":
     main()
