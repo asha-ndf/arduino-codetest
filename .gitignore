@@ -1,0 +1,33 @@
+# Windows
+*.exe
+*.dll
+*.obj
+*.pdb
+*.user
+*.suo
+*.vcxproj.user
+
+# Visual Studio specific
+*.vcxproj*
+*.vcproj*
+*.sln
+*.suo
+*.filters
+*.psess
+*.vsp
+*.vspx
+ipch/
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+*.vcxproj.*.user
+*.VC.db
+
+
+# ---------------------
+# Build directories
+# ---------------------
+build/
+test/tempcode/
+test/CMakeLists.txt
