@@ -24,6 +24,7 @@ ipch/
 *.vcxproj.*.user
 *.VC.db
 
+.vscode/
 
 # ---------------------
 # Build directories
