@@ -1,0 +1,12 @@
+{
+    "testCaseName": "Case1",
+    "description": "Simulate sensor reading from pin=0 over time",
+    "timeValues": [
+      { "time": 0,   "pin": 14, "value": 0 }, 
+      { "time": 30,  "pin": 14, "value": 128 }, 
+      { "time": 100, "pin": 14, "value": 512 }, 
+      { "time": 200, "pin": 14, "value": 1023 }  
+    ],
+    "digitalValues": []
+  }
+  

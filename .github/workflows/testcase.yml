@@ -1,0 +1,38 @@
+name: Arduino-TestCases-Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3
+
+      - name: Convert code
+        run: |
+          cd test
+          python convert_allcases.py ../src/main
+          # これで test/tempcode にモック化コード/ CMakeLists.txt が生成される
+
+      - name: Run testcases
+        id: run-testcases
+        run: |
+          chmod +x test/run_testcases_ubuntu.sh
+          test/run_testcases_ubuntu.sh
+
+      # ここで step outputs を取り出し、Job Summaryに書き込む
+      - name: Summarize test results
+        run: |
+          echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Passed ${{ steps.run-testcases.outputs.passed }} / ${{ steps.run-testcases.outputs.total }} testcases" >> $GITHUB_STEP_SUMMARY

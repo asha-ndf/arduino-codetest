@@ -1,0 +1,15 @@
+{
+    "testCaseName": "CaseWithDigital",
+    "description": "Test scenario for digital read",
+    "timeValues": [
+      { "time": 0, "pin": 0, "value": 100 },
+      { "time": 100, "pin": 0, "value": 150 }
+    ],
+    "digitalValues": [
+      { "time": 0, "pin": 2, "value": 1 },
+      { "time": 50, "pin": 2, "value": 0 },
+      { "time": 150, "pin": 2, "value": 1 }
+    ],
+    "expectedOutputs": ["Sensor Value:", "..."]
+  }
+  

@@ -2,14 +2,18 @@
 #define MOCK_ARDUINO_H
 
 #include <string>
-#include <iostream>
 
 //-------------------------------------
-// Arduinoでよく使われる定数をマクロ化
+// Arduinoで使われる定数をマクロ化
 //-------------------------------------
 #ifndef A0
 #define A0 14
 #endif
+#ifndef A1
+#define A1 15
+#endif
+// 必要なら A2, A3, etc...
+
 #ifndef INPUT
 #define INPUT 0
 #endif
@@ -28,19 +32,28 @@
 #endif
 
 //-------------------------------------
-// グローバル疑似時間
+// グローバル疑似ミリ秒 (宣言だけ)
 //-------------------------------------
-extern unsigned long g_emulator_millis;  
+extern unsigned long g_emulator_millis;
 
 //-------------------------------------
-// 関数プロトタイプ
+// エミュレータ関数群 (宣言のみ)
 //-------------------------------------
+
+// 時間管理
 unsigned long emulatorMillis();
 void emulatorDelay(unsigned long ms);
 
+// デジタルIO
 void emulatorPinMode(int pin, int mode);
-int emulatorAnalogRead(int pin);
+int emulatorDigitalRead(int pin);
+void emulatorDigitalWrite(int pin, int value);
 
+// アナログIO
+int emulatorAnalogRead(int pin);
+void emulatorAnalogWrite(int pin, int value);
+
+// シリアル
 void emulatorSerialBegin(int baud);
 void emulatorSerialPrint(const std::string &s);
 void emulatorSerialPrintln(const std::string &s);
